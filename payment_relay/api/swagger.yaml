@@ -1,0 +1,3886 @@
+openapi: 3.0.0
+info:
+  title: Payment Relay
+  description: "As a wallet solution, the biggest challenge is getting value into\
+    \ the digital payment instrument. This service is a single purpose service with\
+    \ regards to receiving payments while provision the delegation of client specific\
+    \ logic to clients.\nThese are the high-level features required by the Topup relay:\n\
+    \n- Fund switching\n- Transaction reports\n- Fee calculations\n- Pre Execution\
+    \ hook\n- Post Execution hook\n- Consolidated logic for pre and post funding\n\
+    - Discounting at a transaction level\n- Fraud monitoring and reporting\n\nThe\
+    \ goal of this version of the relay is to lay the base and consolidate transaction\
+    \ flow through a single purpose service."
+  contact:
+    name: MM Geeks
+    url: https://www.matchmove.com
+  version: paymentrelay
+servers:
+- url: /
+paths:
+  /callback/{payment_ref_id}/{signature}:
+    post:
+      tags:
+      - Callback
+      summary: Provider call back
+      description: This resource finalizes the payment and processes the topup. This
+        will be triggered from provider side.
+      parameters:
+      - name: payment_ref_id
+        in: path
+        description: Payment Reference Transaction
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+          default: MPIN-UT-KPMJY-37706
+      - name: signature
+        in: path
+        description: Callback Signature for security
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+          default: ""
+      - name: transaction
+        in: path
+        description: "Transaction type [`success`, `failed`, `cancelled`]"
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+          default: ""
+      requestBody:
+        description: "Params returned after callback. This will differ per provider.\n\
+          \n**[NOTE]** In the pre-populated body below, use only one provider set\
+          \ of request data at a time by removing the key that has the provider name.\n\
+          \nex:\n\n\n```\n{\n  'amt': 'string',\n  'email': 'string',\n  'payment_ref_id':\
+          \ 'string',\n  ...\n}\n```\n"
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/providers'
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/response'
+        "400":
+          description: failedProcessTopup
+        "403":
+          description: requestContainsInvalidSignature
+        "500":
+          description: generalApplicationFailure
+  /callback/{payment_ref_id}/{secure_key}:
+    get:
+      tags:
+      - Callback
+      summary: Provider call back
+      description: This resource finalizes the payment and processes the topup. This
+        will be triggered from provider side.
+      parameters:
+      - name: payment_ref_id
+        in: path
+        description: Payment Reference Transaction
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+          default: MPIN-UT-KPMJY-37706
+      - name: secure_key
+        in: path
+        description: Callback secure key for security
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+          default: ""
+      - name: RespCode
+        in: query
+        description: Callback RespCode
+        required: true
+        style: form
+        explode: true
+        schema:
+          type: string
+          default: "1"
+      - name: ReasonCode
+        in: query
+        description: Callback ReasonCode
+        required: true
+        style: form
+        explode: true
+        schema:
+          type: string
+          default: "1"
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/response_1'
+        "400":
+          description: failedProcessTopup
+        "403":
+          description: requestContainsInvalidSignature
+        "500":
+          description: generalApplicationFailure
+  /callback/hook/{type}/{payment_ref_id}:
+    get:
+      tags:
+      - Callback
+      summary: Transaction confirmation hook
+      description: Calls consumer pre or post confirmation urls for additional logic
+        before and after finalization of payment and topup
+      parameters:
+      - name: type
+        in: path
+        description: "Transaction (`pre`, `post`)"
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+          default: pre
+      - name: payment_ref_id
+        in: path
+        description: Payment Reference Transaction
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+          default: MPIN-UT-KPMJY-37706
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/response_2'
+        "404":
+          description: noRecordWasFound
+        "405":
+          description: requestNotAllowed - rejected transaction
+        "500":
+          description: generalApplicationFailure
+  /callback/tokens/{token}:
+    post:
+      tags:
+      - Callback
+      summary: Callback for Providers with Token Reference
+      description: This resource receives token and process the topup
+      parameters:
+      - name: X-Auth-Header
+        in: header
+        description: Consumer ACL Key
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+          default: 717763e4d8384ff1a5e4c7b68d8032d7176b9f1168c180c3d6c9f045ab6bf95e
+      - name: token
+        in: path
+        description: Token Payment Reference Transaction
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+          default: 8HESD8
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/tokens_token_body'
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/response_3'
+        "400":
+          description: failedProcessTopup
+        "403":
+          description: requestContainsInvalidSignature
+        "500":
+          description: generalApplicationFailure
+  /checkout/direct/{provider_hash}:
+    post:
+      tags:
+      - Checkout
+      summary: Initial Payment Processing for Direct Payment Providers
+      description: This resource is used for the initial process of payment from Relay
+        to the Payment Gateway
+      parameters:
+      - name: X-Auth-Header
+        in: header
+        description: Consumer ACL Key
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+          default: b334822cc19e3c7dd86a1db2a4041c2f2f092f826dfc9b79e567ff69b299151f
+      - name: provider_hash
+        in: path
+        description: Provider Hash ID
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+          default: 15196d0dee7d2992f91687f4dc8f6be4
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/direct_provider_hash_body'
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/response_4'
+        "400":
+          description: invalidRequest
+        "500":
+          description: generalApplicationFailure
+  /checkout/hosted/{provider_hash}:
+    post:
+      tags:
+      - Checkout
+      summary: Initial Payment Processing for Hosted Providers
+      description: This resource is used for the initial process of payment from Relay
+        to the Payment Gateway
+      parameters:
+      - name: X-Auth-Header
+        in: header
+        description: Consumer ACL Key
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+          default: 717763e4d8384ff1a5e4c7b68d8032d7176b9f1168c180c3d6c9f045ab6bf95e
+      - name: provider_hash
+        in: path
+        description: Provider Hash ID
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+          default: d3861b12852489f522a0acbdd85efeaf
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/hosted_provider_hash_body'
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/response_5'
+        "400":
+          description: invalidRequest
+        "500":
+          description: generalApplicationFailure
+  /checkout/validate/{provider_hash}:
+    post:
+      tags:
+      - Checkout
+      summary: Checkout Validation Rules
+      description: This resource is used for validating the rules before top-up
+      parameters:
+      - name: provider_hash
+        in: path
+        description: Provider Hash ID
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+          default: 2bd2390f9fcf602ee8544b58cf3c0a57
+      - name: X-Auth-Header
+        in: header
+        description: Consumer ACL Key
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+          default: 717763e4d8384ff1a5e4c7b68d8032d7176b9f1168c180c3d6c9f045ab6bf95e
+      requestBody:
+        $ref: '#/components/requestBodies/postCheckoutValidate_providerHash_'
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/response_6'
+        "400":
+          description: Invalid provider hash validationFailed
+        "500":
+          description: failedToCreateDataRecord generalApplicationFailure
+  /checkout/validate/{provider_hash}/{type}:
+    post:
+      tags:
+      - Checkout
+      summary: Checkout Validation Rules
+      description: This resource is used for validating the rules before top-up
+      parameters:
+      - name: provider_hash
+        in: path
+        description: Provider Hash ID
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+          default: 2bd2390f9fcf602ee8544b58cf3c0a57
+      - name: type
+        in: path
+        description: "Type to validate, [`wallet`, `card`]"
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+          default: wallet
+      - name: X-Auth-Header
+        in: header
+        description: Consumer ACL Key
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+          default: 717763e4d8384ff1a5e4c7b68d8032d7176b9f1168c180c3d6c9f045ab6bf95e
+      requestBody:
+        $ref: '#/components/requestBodies/postCheckoutValidate_providerHash_'
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/response_6'
+        "400":
+          description: Invalid provider hash validationFailed
+        "500":
+          description: failedToCreateDataRecord generalApplicationFailure
+  /consumer/{consumer_hash}/providers:
+    get:
+      tags:
+      - ConsumerProviders
+      summary: Reference list for the providers
+      description: This resource is used for creating reference list for the providers
+      parameters:
+      - name: X-Auth-Header
+        in: header
+        description: Consumer ACL Key
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+          default: b334822cc19e3c7dd86a1db2a4041c2f2f092f826dfc9b79e567ff69b299151f
+      - name: consumer_hash
+        in: path
+        description: Consumer Hash ID
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+          default: 9e050afeed738f820b36a935c8ff1ed5
+      - name: filter_field
+        in: query
+        description: "Filter Field; Allowable: [hash_id, type, currency, name]"
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: string
+          default: provider_hash
+      - name: filter_condition
+        in: query
+        description: "Filter Condition; Allowable: [=]"
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: string
+          default: =
+      - name: filter_value
+        in: query
+        description: Filter Value
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: string
+          default: 782c2b60e8bcd853b86c49a4144fca62
+      - name: sort_field
+        in: query
+        description: "Sort Field; Allowable: [date_created]"
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: string
+          default: date_created
+      - name: sort_direction
+        in: query
+        description: "Direction For Sorting; Allowable: [asc, desc]"
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: string
+          default: asc
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/response_7'
+        "400":
+          description: Invalid consumer hash - validationFailed
+        "500":
+          description: failedToRetereiveDataRecord generalApplicationFailure
+  /references/fees/{consumer_hash}/{provider_hash}:
+    get:
+      tags:
+      - References
+      summary: "Fee data for the consumer, product, provider, channel combination"
+      description: "This resource is used for getting fee for given consumer, product,\
+        \ provider, channel combination"
+      parameters:
+      - name: X-Auth-Header
+        in: header
+        description: Consumer ACL Key
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+          default: 717763e4d8384ff1a5e4c7b68d8032d7176b9f1168c180c3d6c9f045ab6bf95e
+      - name: consumer_hash
+        in: path
+        description: Consumer Hash ID
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+          default: 9e050afeed738f820b36a935c8ff1ed5
+      - name: provider_hash
+        in: path
+        description: Provider Hash ID
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+          default: d3861b12852489f522a0acbdd85efeaf
+      - name: product_code
+        in: query
+        description: Product Code
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: string
+          default: sgmcpr
+      - name: provider_channel
+        in: query
+        description: Provider Channel
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: string
+          default: ""
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/response_8'
+        "400":
+          description: invalidRequest
+        "500":
+          description: generalApplicationFailure
+  /manage/consumer/rates/{consumer_hash}/{provider_hash}:
+    get:
+      tags:
+      - Admin
+      summary: Gets rate per consumer and provider
+      description: Will show the rate per consumer and provider
+      parameters:
+      - name: X-Auth-Header
+        in: header
+        description: Consumer ACL Key
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+          default: 717763e4d8384ff1a5e4c7b68d8032d7176b9f1168c180c3d6c9f045ab6bf95e
+      - name: consumer_hash
+        in: path
+        description: Consumer Hash ID
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+          default: 9e050afeed738f820b36a935c8ff1ed5
+      - name: provider_hash
+        in: path
+        description: provider Hash ID
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+          default: 43043af3eff1155433ec6939cf0ee53d
+      - name: product_code
+        in: query
+        description: product code
+        required: true
+        style: form
+        explode: true
+        schema:
+          type: string
+          default: sgmcpr
+      - name: provider_channel
+        in: query
+        description: provider channel
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: string
+          default: ""
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Fees'
+    put:
+      tags:
+      - Admin
+      summary: Inactivate consumer rate
+      description: Inactivates rate for specific consumer product provider
+      parameters:
+      - name: X-Auth-Header
+        in: header
+        description: Consumer ACL Key
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+          default: 717763e4d8384ff1a5e4c7b68d8032d7176b9f1168c180c3d6c9f045ab6bf95e
+      - name: consumer_hash
+        in: path
+        description: Consumer Hash ID
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+          default: 9e050afeed738f820b36a935c8ff1ed5
+      - name: provider_hash
+        in: path
+        description: Provider Hash ID
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+          default: d3861b12852489f522a0acbdd85efeaf
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/consumer_hash_provider_hash_body'
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Fees'
+    post:
+      tags:
+      - Admin
+      summary: Add rate per consumer and provider
+      description: Add rate per consumer and provider.
+      parameters:
+      - name: X-Auth-Header
+        in: header
+        description: Consumer ACL Key
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+          default: b334822cc19e3c7dd86a1db2a4041c2f2f092f826dfc9b79e567ff69b299151f
+      - name: consumer_hash
+        in: path
+        description: Consumer Hash ID
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+          default: 9e050afeed738f820b36a935c8ff1ed5
+      - name: provider_hash
+        in: path
+        description: provider Hash ID
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+          default: 43043af3eff1155433ec6939cf0ee53d
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/consumer_hash_provider_hash_body_1'
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Fees'
+        "400":
+          description: "Invalid consumer hash validationFailed, Invalid product code"
+        "500":
+          description: "failedToRetereiveDataRecord, generalApplicationFailure"
+  /references/providers/channels:
+    get:
+      tags:
+      - References
+      summary: Get provider channels
+      description: Get provider channels
+      parameters:
+      - name: X-Auth-Header
+        in: header
+        description: Consumer ACL Key
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+          default: 717763e4d8384ff1a5e4c7b68d8032d7176b9f1168c180c3d6c9f045ab6bf95e
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/response_9'
+  /manage/providers:
+    post:
+      tags:
+      - Admin
+      summary: Add provider
+      description: Add provider
+      parameters:
+      - name: X-Auth-Header
+        in: header
+        description: Consumer ACL Key
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+          default: f88acc4dd9848a63d1a726e6a205626c4c8ae873fa099715db4e27e1ad0f2586
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/manage_providers_body'
+      responses:
+        "200":
+          description: Success
+        "400":
+          description: "Provider name already exists, Provider mode not exists, Invalid\
+            \ currency"
+  /redirect:
+    get:
+      tags:
+      - Callback
+      summary: Redirect after final payment(success/fail)
+      description: Redirect after final payment(success/fail)
+      responses:
+        "200":
+          description: OK
+  /redirect/{provider_hash}:
+    get:
+      tags:
+      - Callback
+      summary: Redirect after final payment(success/fail)
+      description: Redirect after final payment(success/fail)
+      responses:
+        "200":
+          description: OK
+  /transaction/status:
+    get:
+      tags:
+      - Transaction
+      summary: Get transaction status
+      description: "Resource that will retrieve transaction status based on topup\
+        \ reference id, payment reference id, or client reference id"
+      parameters:
+      - name: X-Auth-Header
+        in: header
+        description: Consumer ACL Key
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+          default: 717763e4d8384ff1a5e4c7b68d8032d7176b9f1168c180c3d6c9f045ab6bf95e
+      - name: payment_ref_id
+        in: query
+        description: IH Relay Transaction Reference ID
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: string
+          default: ""
+      - name: client_ref_id
+        in: query
+        description: Client Transaction Reference ID
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: string
+          default: ""
+      - name: provider_ref_id
+        in: query
+        description: Reference ID generated by Provider to help identify the transaction
+          as needed in settlement reports and such
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: string
+          default: ""
+      - name: payment_id
+        in: query
+        description: Topup Reference ID
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: string
+          default: ""
+      - name: ref_id
+        in: query
+        description: (For Prefund Consumer) Topup Processor Reference ID
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: string
+          default: ""
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionStatus'
+        "400":
+          description: failedNoPaymentTransactionRecord validationFailed
+        "500":
+          description: failedToRetereiveDataRecord generalApplicationFailure
+  /checkout/token/{provider_hash}:
+    post:
+      description: |
+        This resource is used for the initial process of payment for providers involving tokens from Relay to the Payment Gateway
+      parameters:
+      - name: provider_hash
+        in: path
+        description: Provider Hash ID
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      - name: X-Auth-Header
+        in: header
+        description: Consumer ACL Key
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/token_provider_hash_body'
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/inline_response_200'
+        "400":
+          description: invalidRequest
+        "500":
+          description: generalApplicationFailure
+components:
+  schemas:
+    Easypay2CallbackRequest:
+      required:
+      - TM_ApprovalCode
+      - TM_BankRespCode
+      - TM_CCLast4Digit
+      - TM_CardNum
+      - TM_Currency
+      - TM_DebitAmt
+      - TM_ExpiryDate
+      - TM_MCode
+      - TM_RefNo
+      - TM_Status
+      - TM_TrnType
+      - TM_UserField5
+      properties:
+        TM_MCode:
+          type: string
+          description: Merchant ID assigned by Easypay2
+          example: "20140514001"
+        TM_RefNo:
+          type: string
+          description: Payment Reference ID -- The value in this field is an echo
+            of the `ref` field submitted from IH-Relay to Easypay2
+          example: MPRA-UT-HVBFQ-57897
+        TM_DebitAmt:
+          type: number
+          description: "Amount -- The value in this field is an echo of the `amt`\
+            \ field submitted from IH-Relay to Easypay2 (In json format, this must\
+            \ not be enclosed in quotation marks serving as string)"
+          format: float
+          example: 10.25
+        TM_Currency:
+          type: string
+          description: Currency -- The value in this field is an echo of the `cur`
+            field submitted from IH-Relay to Easypay2
+          example: SGD
+        TM_Status:
+          type: string
+          description: "Status of the Transaction : Valid values\n        `NO` – Unsuccessful\
+            \ (Bank rejected transaction), `YES` – Successful (Bank has authorized\
+            \ the authorization / payment)"
+          example: "YES"
+        TM_ApprovalCode:
+          type: string
+          description: Bank’s approval code for successful transactions NULL or empty
+            if the transaction failed.
+          example: "693332"
+        TM_BankRespCode:
+          type: string
+          description: "Response code returned by the acquiring bank\n        `00`\
+            \ for successful transactions, `NN` denotes failure reason code"
+          example: "00"
+        TM_Error:
+          type: string
+          description: Error details
+          example: ""
+        TM_UserField1:
+          type: string
+          description: Additional user field 1
+          example: ""
+        TM_UserField2:
+          type: string
+          description: Additional user field 2
+          example: ""
+        TM_UserField3:
+          type: string
+          description: Additional user field 3
+          example: ""
+        TM_UserField4:
+          type: string
+          description: Additional user field 4
+          example: ""
+        TM_UserField5:
+          type: string
+          description: "Additional user field 5 : Callback Signature"
+          example: 71a872ec77918d7a219c32be0816652d0f474955f3a87a721e5e0331615927dc83f0dec10ab8d5a1b16dab6d6a7c50f3ceb9b6cc07b5d0b247a1ba2e5a030c5e
+        TM_CCLast4Digit:
+          type: string
+          description: Last 4 digits of credit card number
+          example: "1111"
+        TM_ExpiryDate:
+          type: string
+          description: Credit card expiry date specified in request
+          example: "0518"
+        TM_TrnType:
+          type: string
+          description: Type of transaction performed
+          example: sale
+        TM_SubTrnType:
+          type: string
+          description: Sub-type of transaction performed
+          example: "null"
+        TM_CardNum:
+          type: string
+          description: This value is returned if rcard is specified from IH-Relay
+            to Easypay2
+          example: 411111xxxxxx1111
+        TM_OriginalPayType:
+          type: string
+          description: Transaction pay type
+          example: ""
+        additional_hook:
+          type: string
+          description: JSON encoded text string containing additional parameters for
+            confirmation hook
+          example: ""
+    EnetsCallbackRequest:
+      required:
+      - bank_id
+      - bank_ref_code
+      - bank_remarks
+      - bank_status
+      - bank_txn_date
+      - bank_txn_time
+      - dest_currency_code
+      - dest_exchg_rate
+      - merchant_txn_ref
+      - nets_txn_msg
+      - nets_txn_ref
+      - nets_txn_resp_code
+      - nets_txn_status
+      - nets_txn_time
+      - src_currency_code
+      - src_exchg_rate
+      - src_txn_amount
+      - txnAmount
+      properties:
+        merchant_txn_ref:
+          type: string
+          description: Payment Reference ID
+          example: MDEN-UT-FHRXI-74117
+        nets_txn_ref:
+          type: string
+          description: Enets Reference ID
+          example: "20160715104729661"
+        nets_txn_status:
+          type: string
+          description: Enets Status Code
+          example: "0"
+        nets_txn_resp_code:
+          type: string
+          description: Enets Response Code
+          example: 000008_000000
+        nets_txn_msg:
+          type: string
+          description: Enets Response Message
+          example: Transaction Success
+        nets_txn_time:
+          type: string
+          description: Enets Recorded Transaction Time
+          example: 10:47:30
+        bank_id:
+          type: string
+          description: Bank ID
+          example: "8181"
+        bank_ref_code:
+          type: string
+          description: Bank Reference ID
+          example: "20160715104744062"
+        bank_remarks:
+          type: string
+          description: Bank Response Message
+          example: eNETS Debit Bank Sim
+        bank_status:
+          type: string
+          description: Bank Status Code
+          example: "00000"
+        bank_txn_date:
+          type: string
+          description: Bank Recorded Transaction Date
+          example: 15/07/2016
+        bank_txn_time:
+          type: string
+          description: Bank Recorded Transaction Time
+          example: 10:47:44
+        txnAmount:
+          type: string
+          description: Amount to topup
+          example: "10"
+        src_exchg_rate:
+          type: string
+          description: Source Exchange Rate
+          example: "1"
+        dest_exchg_rate:
+          type: string
+          description: Destination Exchange Rate
+          example: "1"
+        src_txn_amount:
+          type: string
+          description: Source Transaction Amount
+          example: "10"
+        src_currency_code:
+          type: string
+          description: Source Transaction Currency Code
+          example: SGD
+        dest_currency_code:
+          type: string
+          description: Destination Transaction Currency Code
+          example: SGD
+        additional_hook:
+          type: string
+          description: JSON encoded text string containing additional parameters for
+            confirmation hook
+          example: ""
+    MMADpayCallbackRequest:
+      required:
+      - AMOUNT
+      - CURRENCY_CODE
+      - CUST_EMAIL
+      - CUST_ID
+      - CUST_NAME
+      - CUST_PHONE
+      - HASH
+      - ORDER_ID
+      - PAY_ID
+      - PRODUCT_DESC
+      - RESPONSE_CODE
+      - RESPONSE_DATE_TIME
+      - RESPONSE_MESSAGE
+      - RETURN_URL
+      - STATUS
+      - TXNTYPE
+      - TXN_ID
+      properties:
+        RESPONSE_DATE_TIME:
+          type: string
+          description: Timestamp of Request
+          example: 2018-09-24 20:44:45
+        RESPONSE_CODE:
+          type: string
+          description: Response Code
+          example: "000"
+        CUST_ID:
+          type: string
+          description: Customer User Hash ID
+          example: 9d368b799df81bd4b566f136c05c9139
+        AUTH_CODE:
+          type: string
+          description: MMADpay Authorization Code
+          example: "000000"
+        CUST_PHONE:
+          type: string
+          description: Customer Mobile Number
+          example: "9900990099"
+        MOP_TYPE:
+          type: string
+          description: MMADpay MOP Type
+          example: VI
+        CARD_MASK:
+          type: string
+          description: Masked Card Number
+          example: 401200******1112
+        CURRENCY_CODE:
+          type: string
+          description: Currency Code in ISO 4217 numeric format
+          example: "356"
+        RRN:
+          type: string
+          description: Bank Reference Number
+          example: "826710001065"
+        PG_TXN_MESSAGE:
+          type: string
+          description: MMADpay Transaction Message
+          example: CAPTURED
+        STATUS:
+          type: string
+          description: Transaction Status
+          example: Captured
+        PRODUCT_DESC:
+          type: string
+          description: Product Description
+          example: PHPAPI
+        PG_REF_NUM:
+          type: string
+          description: Unique Identifier by IRCTC iPay
+          example: "4601480924204427"
+        AMOUNT:
+          type: string
+          description: Amount
+          example: "12500"
+        RESPONSE_MESSAGE:
+          type: string
+          description: Response Message
+          example: SUCCESS
+        CUST_EMAIL:
+          type: string
+          description: Customer Email
+          example: cust@test.com
+        TXN_ID:
+          type: string
+          description: Unique Transaction Identifier by IRCTC iPay
+          example: "4611480924204445"
+        ACQ_ID:
+          type: string
+          description: MMADpay Acq ID
+          example: "201826700904377"
+        TXNTYPE:
+          type: string
+          description: Transaction Type
+          example: SALE
+        SURCHARGE_FLAG:
+          type: string
+          description: Flag whether surcharge is applied
+          example: "Y"
+        HASH:
+          type: string
+          description: Security Hash for each unique transaction
+          example: AFA5D6D086EC7D9E542F7249D2AD857AD6634B126C21C41A4FD747EF3BADE618
+        PAYMENT_TYPE:
+          type: string
+          description: Payment type
+          example: CC
+        RETURN_URL:
+          type: string
+          description: Callback URL
+          example: http://beta-ih-relay.mmvpay.com/callback/MDEN-UT-CVAUN-49719
+        PAY_ID:
+          type: string
+          description: Merchant ID
+          example: 1009XXXXXXXXX042
+        ORDER_ID:
+          type: string
+          description: Payment Reference ID
+          example: MDEN-UT-CVAUN-49719
+        ORIG_TXN_ID:
+          type: string
+          description: Original Unique Transaction Identifier by IRCTC iPay
+          example: "4601480924204427"
+        AVR:
+          type: string
+          description: MMADpay AVR
+          example: "Y"
+        CUST_NAME:
+          type: string
+          description: Customer Name
+          example: John Doe
+    RazorpayCallbackRequest:
+      required:
+      - payment_ref_id
+      - razorpay_payment_id
+      - signature
+      properties:
+        amt:
+          type: string
+          description: Amount
+          example: "1000"
+        consumer_hash:
+          type: string
+          description: Consumer hash
+          example: 5a981f4283653ce866b1e461f8298920
+        product_code:
+          type: string
+          description: Product code
+          example: ctmfpr
+        email:
+          type: string
+          description: User email
+          example: sample@email.com
+        payment_ref_id:
+          type: string
+          description: Payment Reference ID
+          example: MPRA-UT-HVBFQ-57897
+        razorpay_payment_id:
+          type: string
+          description: Razorpay Payment ID
+          example: pay_8TnsfOJvRU9MAm
+        signature:
+          type: string
+          description: Signature
+          example: 2b3629fc1466afee03d72ab9569e24f012bb2c70fc7dde388570575019697717f727004e61436ffc14116c2b49772a00c2f53172efe4250ce44917f32756d211
+        additional_hook:
+          type: string
+          description: JSON encoded text string containing additional parameters for
+            confirmation hook
+          example: ""
+    Activities:
+      required:
+      - consumer_id
+      - date_created
+      - details
+      - id
+      - ip
+      properties:
+        id:
+          type: integer
+          description: Record ID
+          example: 1
+        consumer_id:
+          type: integer
+          description: Consumer ID
+          example: 1
+        ip:
+          type: string
+          description: IP address of user
+          example: XXX.X.X.X
+        details:
+          type: string
+          description: Request details
+          example: "{key:value}"
+        date_created:
+          type: string
+          description: Date created `(YYYY-MM-DD HH:MM:SS)`
+          format: date
+    Consumers:
+      required:
+      - acl_key
+      - code
+      - consumer_hash
+      - description
+      - is_admin
+      - status
+      properties:
+        consumer_hash:
+          type: string
+          description: Consumer Hash ID
+          example: 9e050afeed738f820b36a935c8ff1ed5
+        acl_key:
+          type: string
+          description: Consumer ACK Key
+          example: f88acc4dd9848a63d1a726e6a205626c4c8ae873fa099715db4e27e1ad0f2586
+        code:
+          type: string
+          description: Consumer code name
+          example: sgmc
+        description:
+          type: string
+          description: Consumer description
+          example: XYZ consumer
+        pre_credit_confirm:
+          type: string
+          description: "Will call a client's external pre-credit url before doing\
+            \ payment and topup [`0`, `1`]"
+          default: "0"
+        pre_credit_url_method:
+          type: string
+          description: "Client's external pre-credit url method to call before doing\
+            \ payment and topup [`GET`, `POST`, `PUT`, `DELETE`]"
+          default: ""
+        pre_credit_url:
+          type: string
+          description: Client's external pre-credit url to call before doing payment
+            and topup
+          default: ""
+        post_credit_confirm:
+          type: string
+          description: "Will call a client's external pre-credit url after doing payment\
+            \ and topup [`0`, `1`]"
+          default: "0"
+        post_credit_url_method:
+          type: string
+          description: "Client's external pre-credit url method to call after doing\
+            \ payment and topup [`GET`, `POST`, `PUT`, `DELETE`]"
+          default: ""
+        post_credit_url:
+          type: string
+          description: Client's external pre-credit url to call after doing payment
+            and topup
+          default: ""
+        timezone:
+          type: string
+          description: "Timezone in [TZ format](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones)"
+          example: Asia/Singapore
+          default: Asia/Singapore
+        time_offset:
+          type: string
+          description: "Time Offset in [UTC format](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones)"
+          example: +08:00
+          default: +08:00
+        status:
+          type: string
+          description: "Status [`active`, `inactive`, `terminated`]"
+          example: active
+          default: active
+        is_admin:
+          type: integer
+          description: Is admin
+          example: 0
+        date_created:
+          type: string
+          description: Date created `(YYYY-MM-DD HH:MM:SS)`
+          format: date
+        date_modified:
+          type: string
+          description: Date modified `(YYYY-MM-DD HH:MM:SS)`
+          format: date
+    TransactionStatus:
+      required:
+      - client_ref_id
+      - message
+      - payment_id
+      - payment_ref_id
+      - ref_id
+      - status
+      properties:
+        payment_ref_id:
+          type: string
+          description: IH Relay Transaction Reference ID
+          example: MPIN-UT-YJAKG-15608
+        client_ref_id:
+          type: string
+          description: Client Transaction Reference ID
+          example: MPIN-UT-YJAKG-15608
+        provider_ref_id:
+          type: string
+          description: Reference ID generated by Provider to help identify the transaction
+            as needed in settlement reports and such
+          example: "1199181003123030"
+        payment_id:
+          type: string
+          description: Topup Reference ID
+          example: SGMCPOEASYPAY2003B9C251500039763
+        ref_id:
+          type: string
+          description: (For Prefund Consumer) Topup Processor Reference ID
+          example: fcbc530592fe18a6a6b261df7398926f06208afc84c861c1cd995464dcbbe42a
+        status:
+          type: string
+          description: Transaction status
+          example: SUCCESS
+        message:
+          type: string
+          description: Transaction status description
+          example: Topup successful
+        details:
+          $ref: '#/components/schemas/TransactionStatus_details'
+      example:
+        client_ref_id: MPIN-UT-YJAKG-15608
+        ref_id: fcbc530592fe18a6a6b261df7398926f06208afc84c861c1cd995464dcbbe42a
+        payment_ref_id: MPIN-UT-YJAKG-15608
+        payment_id: SGMCPOEASYPAY2003B9C251500039763
+        provider_ref_id: "1199181003123030"
+        details:
+          fees:
+            fee_percentage: "0.00"
+            amount: "10.00"
+            fee_flat: "2.00"
+            total_fees: "2.00"
+            credit_amount: "8.00"
+            discount: "0.00"
+            currency: SGD
+            net_amount: "10.00"
+          provider: {}
+          source:
+            referrer: ""
+            account_number: 405900******1234
+            funding_method: CREDIT
+            cust_email: ""
+            name: Asia United Bank
+            cust_name: John Doe
+            expiry: "0521"
+            type: CARD
+            cust_id: a4f7e6ca0f364315c6250cb294f03360
+            cust_phone: "1234567890"
+            brand: VISA
+            authentication: "000000"
+          user:
+            mobile: "1234567890"
+            name: John Doe
+            id: a4f7e6ca0f364315c6250cb294f03360
+            mobile_country_code: "91"
+            product_code: sgmcrpo
+            email: johndoe@example.com
+        message: Topup successful
+        status: SUCCESS
+    Fees:
+      required:
+      - charge_flat
+      - charge_percentage
+      - consumer
+      - date_created
+      - date_modified
+      - fee_flat
+      - fee_percentage
+      - id
+      - is_active
+      - product
+      - provider
+      - provider_channel
+      - service_flat
+      - service_percentage
+      - tax_flat
+      - tax_percentage
+      properties:
+        id:
+          type: string
+          description: Fees Hash Id
+          example: ed0fb3317f03949168d4cbdaa805fdb0
+        consumer:
+          $ref: '#/components/schemas/Fees_consumer'
+        product:
+          $ref: '#/components/schemas/Fees_product'
+        provider:
+          $ref: '#/components/schemas/Fees_provider'
+        provider_channel:
+          $ref: '#/components/schemas/Fees_provider_channel'
+        fee_flat:
+          type: decimal
+          description: Basic fee in flat
+          example: "0.000"
+        fee_percentage:
+          type: decimal
+          description: Basic fee in percentage
+          example: "0.00"
+        tax_flat:
+          type: decimal
+          description: Tax fee in flat
+          example: "0.000"
+        tax_percentage:
+          type: decimal
+          description: Tax fee in percentage
+          example: "0.00"
+        charge_flat:
+          type: decimal
+          description: Charge fee in flat
+          example: "0.000"
+        charge_percentage:
+          type: decimal
+          description: Charge fee in percentage
+          example: "0.00"
+        service_flat:
+          type: decimal
+          description: Service fee in flat
+          example: "0.000"
+        service_percentage:
+          type: decimal
+          description: Service fee in percentage
+          example: "0.00"
+        is_active:
+          type: integer
+          description: Is active
+          example: 0
+        date_inactive:
+          type: string
+          description: Date inactivated
+          format: date
+        modified_by:
+          $ref: '#/components/schemas/Fees_modified_by'
+        date_created:
+          type: string
+          description: Date created
+          format: date
+        date_modified:
+          type: string
+          description: Date modified
+          format: date
+      example:
+        fee_percentage: "0.00"
+        product:
+          code: xxxpr
+          funding_type: pre-funding
+        provider_channel:
+          code: post_office
+          name: Post Office
+        fee_flat: "0.000"
+        is_active: 0
+        charge_flat: "0.000"
+        date_created: 2000-01-23
+        date_inactive: 2000-01-23
+        service_flat: "0.000"
+        service_percentage: "0.00"
+        charge_percentage: "0.00"
+        date_modified: 2000-01-23
+        provider:
+          name: Provider A
+          id: 5d260bdcca738f820b36a935c8ff9fg8
+        tax_flat: "0.000"
+        tax_percentage: "0.00"
+        modified_by:
+          consumer_hash: 2017-10-03 00:36:11
+          consumer_name: 2017-10-03 00:36:11
+        id: ed0fb3317f03949168d4cbdaa805fdb0
+        consumer:
+          name: Consumer A
+          id: 9e050afeed738f820b36a935c8ff1ed5
+    ProviderChannels:
+      required:
+      - code
+      - description
+      - name
+      properties:
+        code:
+          type: string
+          description: Provider channel code
+          example: post_office
+        name:
+          type: string
+          description: Provider channel name
+          example: Post Office
+        description:
+          type: string
+          description: Provider channel description
+          example: Singapore Post Office
+      example:
+        code: post_office
+        name: Post Office
+        description: Singapore Post Office
+    RefundActions:
+      required:
+      - action_message
+      - action_origin
+      - action_result
+      - date_created
+      - date_modified
+      - id
+      - refund_id
+      - remarks
+      properties:
+        id:
+          type: integer
+          description: Refund action ID
+        refund_id:
+          type: integer
+          description: Refund ID
+        action_result:
+          type: string
+          description: "The action e.g. processing, enquiring etc."
+        action_origin:
+          type: string
+          description: "Origin of the action (admin, cron, client, payment_provider,\
+            \ topup)"
+        action_message:
+          type: string
+          description: General human readable description of the action
+        remarks:
+          type: string
+          description: Remarks
+        date_created:
+          type: string
+          description: Date created `(YYYY-MM-DD HH:MM:SS)`
+          format: date
+        date_modified:
+          type: string
+          description: Date modified `(YYYY-MM-DD HH:MM:SS)`
+          format: date
+    Refunds:
+      required:
+      - action
+      - amount
+      - attempts
+      - credit_id
+      - date_created
+      - date_modified
+      - id
+      - payment_ref_id
+      - provider_ref_id
+      - reason
+      - refund_ref_id
+      - status
+      - type
+      properties:
+        id:
+          type: integer
+          description: Refund ID
+        credit_id:
+          type: integer
+          description: Topup/Credit ID
+        payment_ref_id:
+          type: string
+          description: Payment reference ID
+          example: MMMM-MM-MMMMM-00000
+        refund_ref_id:
+          type: string
+          description: Refund reference ID
+          example: R68400-MPMM-UT-SGZCY-96377
+        provider_ref_id:
+          type: string
+          description: Provider reference ID
+          example: ""
+        type:
+          type: string
+          description: "Refund type (full, partial)"
+        action:
+          type: string
+          description: "During which action refund transaction is created [topup,\
+            \ stale, blacklist, cron, settlement]"
+          example: topup
+        amount:
+          type: integer
+          description: Refund amount
+        reason:
+          type: string
+          description: reason for refund
+          example: test reason
+        attempts:
+          type: integer
+          description: Number of refund attempts
+        status:
+          type: integer
+          description: "Status [`0`, `1`, `2`, `3`, `4`, `5`, `6`]"
+        date_created:
+          type: string
+          description: Date created `(YYYY-MM-DD HH:MM:SS)`
+          format: date
+        date_modified:
+          type: string
+          description: Date modified `(YYYY-MM-DD HH:MM:SS)`
+          format: date
+    TransactionWhitelist:
+      required:
+      - amount
+      - consumer_name
+      - cust_name
+      - date_created
+      - date_modified
+      - id
+      - is_active
+      - product_code
+      - provider_name
+      - source_brand
+      - source_expiry
+      - source_funding_method
+      - source_name
+      - source_number
+      - source_type
+      - user_hash_id
+      properties:
+        id:
+          type: string
+          description: Fees Hash Id
+          example: ed0fb3317f03949168d4cbdaa805fdb0
+        consumer_name:
+          type: string
+          description: Consumer Name
+          example: IRCTC
+        product_code:
+          type: string
+          description: Product Code
+          example: inirctc
+        provider_name:
+          type: string
+          description: Provider Name
+          example: MMADpay
+        user_hash_id:
+          type: string
+          description: User Hash ID
+          example: a4f7e6ca0f364315c6250cb294f03360
+        amount:
+          type: decimal
+          description: Topup amount
+          example: "10.00"
+        cust_name:
+          type: string
+          description: "Name entered from payment provider screen, if any"
+          example: John Doe
+        source_type:
+          type: string
+          description: "Source type from payment screen whether entered Card, UPI,\
+            \ etc"
+          example: CARD
+        source_name:
+          type: string
+          description: Source type issuer name
+          example: Asia United Bank
+        source_number:
+          type: string
+          description: Source account number or address
+          example: 405900******1234
+        source_expiry:
+          type: string
+          description: "Source account expiry, if applicable"
+          example: "0521"
+        source_brand:
+          type: string
+          description: Source brand
+          example: VISA
+        source_funding_method:
+          type: string
+          description: Source funding method
+          example: CREDIT
+        is_active:
+          type: boolean
+          description: Is active
+          example: true
+        date_created:
+          type: string
+          description: Date created
+          format: date
+        date_modified:
+          type: string
+          description: Date modified
+          format: date
+    VirtualAddress:
+      required:
+      - bank
+      - consumer
+      - date_created
+      - date_modified
+      - id
+      - is_active
+      - provider
+      - transaction_id
+      - user
+      properties:
+        id:
+          type: string
+          description: Virtual Address Hash Id
+          example: ed0fb3317f03949168d4cbdaa805fdb0
+        transaction_id:
+          type: string
+          description: Unique Identifier from Provider
+          example: FDR201805291020MBUUT12345ABCDE
+        consumer:
+          $ref: '#/components/schemas/Fees_consumer'
+        provider:
+          $ref: '#/components/schemas/Fees_provider'
+        user:
+          $ref: '#/components/schemas/VirtualAddress_user'
+        bank:
+          $ref: '#/components/schemas/VirtualAddress_bank'
+        is_active:
+          type: boolean
+          description: Is active
+          example: true
+        date_created:
+          type: string
+          description: Date created
+          format: date
+        date_modified:
+          type: string
+          description: Date modified
+          format: date
+    References:
+      properties: {}
+    TransactionItem:
+      properties:
+        id:
+          type: string
+          description: Transaction Unique Identifier
+          example: a4f7e6ca0f364315c6250cb294f03360
+        provider_id:
+          type: string
+          description: Provider Hash ID
+          example: 7f36913ad36c1bf6cadccb623bcede45
+        provider_name:
+          type: string
+          description: Provider Name
+          example: MMADpay
+        payment_ref_id:
+          type: string
+          description: IH Relay Transaction Reference ID
+          example: MPMM-UT-RHYAW-60505
+        client_ref_id:
+          type: string
+          description: Client Transaction Reference ID
+          example: IMUDRA-MMADPAY-0001
+        provider_ref_id:
+          type: string
+          description: Reference ID generated by Provider to help identify the transaction
+            as needed in settlement reports and such
+          example: "1190457891231876"
+        refund_ref_id:
+          type: string
+          description: Refund Reference ID
+          example: R00196-MPMM-UT-RHYAW-60505
+        payment_id:
+          type: string
+          description: Topup Reference ID
+          example: "5246380100004984"
+        ref_id:
+          type: string
+          description: (For Prefund Consumer) Topup Processor Reference ID
+          example: ""
+        status_id:
+          type: string
+          description: Status ID
+          example: "12"
+        status:
+          type: string
+          description: Status Name
+          example: REFUNDED
+        message:
+          type: string
+          description: Status Description
+          example: Refunded
+        refund_details:
+          $ref: '#/components/schemas/TransactionItem_refund_details'
+        amount:
+          type: string
+          description: Topup Amount
+          example: "10.00"
+        fee:
+          $ref: '#/components/schemas/TransactionItem_fee'
+        user:
+          $ref: '#/components/schemas/TransactionStatus_details_user'
+        source:
+          $ref: '#/components/schemas/TransactionStatus_details_source'
+        details:
+          type: object
+          properties: {}
+          description: Payment Provider Status Inquiry
+        date_holding_expiry:
+          type: string
+          description: Expiry Date until Transaction will be released from hold state
+          example: 2019-09-06 09:00:47 IST
+        date_flagged_risk:
+          type: string
+          description: Date when transaction was flagged as risk
+          example: 2019-09-06 09:00:47 IST
+        date_blacklisted:
+          type: string
+          description: Date when transaction was blacklisted
+          example: 2019-09-06 09:00:47 IST
+        date_refunded:
+          type: string
+          description: Date when transaction was refunded
+          example: 2019-09-06 09:00:47 IST
+        date_created:
+          type: string
+          description: Transaction Date
+          example: 2019-09-06 09:00:47 IST
+        date_modified:
+          type: string
+          description: Transaction Date Updated
+          example: 2019-09-06 09:00:47 IST
+    providers:
+      title: providers
+      type: object
+      properties:
+        razorpay:
+          $ref: '#/components/schemas/RazorpayCallbackRequest'
+        easypay2:
+          $ref: '#/components/schemas/Easypay2CallbackRequest'
+        enets:
+          $ref: '#/components/schemas/EnetsCallbackRequest'
+    response:
+      title: response
+      required:
+      - ack
+      - details
+      - eod
+      - mid
+      - ref
+      type: object
+      properties:
+        mid:
+          type: string
+          description: Provider-specific Merchant Id
+          example: MID-XX-1
+        ref:
+          type: string
+          description: Unique Payment Reference Id
+          example: MPIN-UT-KPMJY-37706
+        ack:
+          type: string
+          description: Payment Acknowledgement Status
+          example: "YES"
+        eod:
+          type: string
+          description: Topup Response Message
+          example: 2017-08-20 09:21:18 --- Topup Successful for ref_id 46fc2fc09405f5e1ad66f9958316f38a75244d329b5fba33e4fae2d31f408b78
+        details:
+          type: array
+          items:
+            $ref: '#/components/schemas/response_details'
+      example:
+        ref: MPIN-UT-KPMJY-37706
+        ack: "YES"
+        mid: MID-XX-1
+        details:
+        - reference:
+          - client_ref_id: MPIN-UT-KPMJY-37706
+            ref_id: 46fc2fc09405f5e1ad66f9958316f38a75244d329b5fba33e4fae2d31f408b78
+            payment_ref_id: MPIN-UT-KPMJY-37706
+            payment_id: SGMCPREASYPAY2003B9C1F5000038E3D
+            provider_ref_id: "1199181003123030"
+          - client_ref_id: MPIN-UT-KPMJY-37706
+            ref_id: 46fc2fc09405f5e1ad66f9958316f38a75244d329b5fba33e4fae2d31f408b78
+            payment_ref_id: MPIN-UT-KPMJY-37706
+            payment_id: SGMCPREASYPAY2003B9C1F5000038E3D
+            provider_ref_id: "1199181003123030"
+          topup:
+          - amount: 10.000
+            currency: SGD
+          - amount: 10.000
+            currency: SGD
+          user:
+          - mobile: 11111111
+            mobile_country_code: 65
+            email: test@email.com
+          - mobile: 11111111
+            mobile_country_code: 65
+            email: test@email.com
+        - reference:
+          - client_ref_id: MPIN-UT-KPMJY-37706
+            ref_id: 46fc2fc09405f5e1ad66f9958316f38a75244d329b5fba33e4fae2d31f408b78
+            payment_ref_id: MPIN-UT-KPMJY-37706
+            payment_id: SGMCPREASYPAY2003B9C1F5000038E3D
+            provider_ref_id: "1199181003123030"
+          - client_ref_id: MPIN-UT-KPMJY-37706
+            ref_id: 46fc2fc09405f5e1ad66f9958316f38a75244d329b5fba33e4fae2d31f408b78
+            payment_ref_id: MPIN-UT-KPMJY-37706
+            payment_id: SGMCPREASYPAY2003B9C1F5000038E3D
+            provider_ref_id: "1199181003123030"
+          topup:
+          - amount: 10.000
+            currency: SGD
+          - amount: 10.000
+            currency: SGD
+          user:
+          - mobile: 11111111
+            mobile_country_code: 65
+            email: test@email.com
+          - mobile: 11111111
+            mobile_country_code: 65
+            email: test@email.com
+        eod: 2017-08-20 09:21:18 --- Topup Successful for ref_id 46fc2fc09405f5e1ad66f9958316f38a75244d329b5fba33e4fae2d31f408b78
+    response_1:
+      title: response
+      required:
+      - ack
+      - eod
+      - ref
+      type: object
+      properties:
+        ref:
+          type: string
+          description: Unique Payment Reference Id
+          example: MPIN-UT-KPMJY-37706
+        ack:
+          type: string
+          description: Payment Acknowledgement Status
+          example: "YES"
+        eod:
+          type: string
+          description: Topup Response Message
+          example: 2017-08-20 09:21:18 --- Topup Successful for ref_id 46fc2fc09405f5e1ad66f9958316f38a75244d329b5fba33e4fae2d31f408b78
+      example:
+        ref: MPIN-UT-KPMJY-37706
+        ack: "YES"
+        eod: 2017-08-20 09:21:18 --- Topup Successful for ref_id 46fc2fc09405f5e1ad66f9958316f38a75244d329b5fba33e4fae2d31f408b78
+    response_2:
+      title: response
+      required:
+      - status
+      type: object
+      properties:
+        status:
+          type: string
+          description: Is request `approved` or `rejected`
+          example: approved
+      example:
+        status: approved
+    tokens_token_body:
+      required:
+      - amount
+      - currency
+      - signature
+      type: object
+      properties:
+        signature:
+          type: string
+          description: Callback Signature for security
+          default: ""
+        amount:
+          type: number
+          description: Topup amount
+          format: float
+        currency:
+          type: string
+          description: "Currency code [ISO 3166](https://www.iso.org/iso-3166-country-codes.html)\
+            \ alpha-3"
+          default: SGD
+        client_ref_id:
+          type: string
+          description: Consumer Identifier for a Payment Transaction
+        additional_hook:
+          type: string
+          description: JSON encoded text string containing additional parameters for
+            confirmation hook
+    response_3:
+      title: response
+      required:
+      - ack
+      - details
+      - eod
+      - ref
+      type: object
+      properties:
+        ref:
+          type: string
+          description: Unique Payment Token Reference
+          example: 8HESd8
+        ack:
+          type: string
+          description: Payment Acknowledgement Status
+          example: "YES"
+        eod:
+          type: string
+          description: Topup Response Message
+          example: 2017-08-20 09:21:18 --- Topup Successful for ref_id 46fc2fc09405f5e1ad66f9958316f38a75244d329b5fba33e4fae2d31f408b78
+        details:
+          $ref: '#/components/schemas/response_3_details'
+      example:
+        ref: 8HESd8
+        ack: "YES"
+        details:
+          reference:
+            client_ref_id: MPIN-UT-KPMJY-37706
+            ref_id: 46fc2fc09405f5e1ad66f9958316f38a75244d329b5fba33e4fae2d31f408b78
+            payment_ref_id: MPIN-UT-KPMJY-37706
+            payment_id: SGMCPREASYPAY2003B9C1F5000038E3D
+          fees:
+            fee_percentage: "0.00"
+            amount: "10.00"
+            fee_flat: "2.00"
+            calculation_mode: net
+            total_fees: "2.00"
+            credit_amount: "8.00"
+            discount: "0.00"
+            currency: SGD
+            net_amount: "10.00"
+            computation: flat
+          topup:
+            amount: "8.00"
+            currency: SGD
+          user:
+            mobile: 11111111
+            mobile_country_code: 65
+            email: test@email.com
+        eod: 2017-08-20 09:21:18 --- Topup Successful for ref_id 46fc2fc09405f5e1ad66f9958316f38a75244d329b5fba33e4fae2d31f408b78
+    direct_provider_hash_body:
+      required:
+      - amount
+      - consumer_hash
+      - kyc_status
+      - product_code
+      - user_hash_id
+      type: object
+      properties:
+        consumer_hash:
+          type: string
+          description: Consumer Hash ID
+          default: 9e050afeed738f820b36a935c8ff1ed5
+        product_code:
+          type: string
+          description: OP Product Code
+          default: sgmcpr
+        amount:
+          type: number
+          description: Topup amount
+          format: float
+        kyc_status:
+          type: string
+          description: "User KYC Status [`pre_kyc`, `post_kyc`]"
+          default: pre_kyc
+        user_hash_id:
+          type: string
+          description: User Unique Identifier
+          default: c4432940228d7fc04bb1656e10103c60
+        email:
+          type: string
+          description: User Email Address
+          default: louie+relay1508151862@matchmove.com
+        mobile_country_code:
+          type: integer
+          description: User Mobile Country Code
+        mobile:
+          type: integer
+          description: User Mobile Number
+        currency:
+          type: string
+          description: Currency code ISO 4217 alpha code
+          default: SGD
+        card_token:
+          type: string
+          description: Token assigned to a particular card of the current user
+        pan:
+          type: string
+          description: User's Card Primary Account Number
+        expiry_month:
+          type: string
+          description: Expiry Month of User's Card Primary Account Number
+        expiry_year:
+          type: string
+          description: Expiry Year of User's Card Primary Account Number
+        security_code:
+          type: string
+          description: Security Code of User's Card Primary Account Number
+        source:
+          type: string
+          description: "Source on where we received the transaction [`CALL_CENTRE`,\
+            \ `CARD_PRESENT`, `INTERNET`, `MAIL_ORDER`, `MOTO`, `TELEPHONE_ORDER`,\
+            \ `VOICE_RESPONSE`]"
+          default: INTERNET
+        billing_address:
+          type: string
+          description: "JSON-encoded value of User's billing address which should\
+            \ contain [street, street2, city, stateProvince, country(3 letter ISO\
+            \ standard alpha country code), postcodeZip]"
+          default: ""
+        customer:
+          type: string
+          description: "JSON-encoded value of User's Details which should contain\
+            \ [firstName, lastName]"
+          default: ""
+        client_ref_id:
+          type: string
+          description: Consumer Identifier for a Payment Transaction
+        client_ip:
+          type: string
+          description: Client IP Address
+          default: ""
+        action_origin:
+          type: string
+          description: "Origin on where the payment transaction is executed [`admin`,\
+            \ `client`, `cron`, `payment_provider`]"
+          default: client
+        save_card:
+          type: string
+          description: Will save card
+          default: "0"
+          enum:
+          - "0"
+          - "1"
+    response_4:
+      title: response
+      required:
+      - consumer
+      - links
+      - payment_ref_id
+      - product
+      - provider
+      - user
+      type: object
+      properties:
+        payment_ref_id:
+          type: string
+          description: Unique Payment Reference Id
+          example: MMP-123456
+        consumer:
+          type: array
+          description: Consumer Details
+          items:
+            $ref: '#/components/schemas/response_4_consumer'
+        product:
+          type: array
+          description: Product Details
+          items:
+            $ref: '#/components/schemas/response_4_product'
+        provider:
+          type: array
+          description: Provider Details
+          items:
+            $ref: '#/components/schemas/response_4_provider'
+        user:
+          type: array
+          description: "User Details like hash id, email and any other user related\
+            \ info"
+          items:
+            $ref: '#/components/schemas/response_4_user'
+        html_content:
+          type: string
+          description: HTML Content to be rendered to user's browser
+      example:
+        product:
+        - code: xxxpr
+          funding_type: pre-funding
+        - code: xxxpr
+          funding_type: pre-funding
+        html_content: html_content
+        provider:
+        - name: Provider A
+        - name: Provider A
+        payment_ref_id: MMP-123456
+        user:
+        - email: test@example.com
+          hash_id: b234cabd0cae5ea241589e4788ac727c
+        - email: test@example.com
+          hash_id: b234cabd0cae5ea241589e4788ac727c
+        consumer:
+        - name: Consumer A
+          hash_id: 9e050afeed738f820b36a935c8ff1ed5
+        - name: Consumer A
+          hash_id: 9e050afeed738f820b36a935c8ff1ed5
+    hosted_provider_hash_body:
+      required:
+      - amount
+      - consumer_hash
+      - kyc_status
+      - product_code
+      - user_hash_id
+      type: object
+      properties:
+        consumer_hash:
+          type: string
+          description: Consumer Hash ID
+          default: 9e050afeed738f820b36a935c8ff1ed5
+        product_code:
+          type: string
+          description: OP Product Code
+          default: sgmcpr
+        amount:
+          type: number
+          description: Topup amount
+          format: float
+        kyc_status:
+          type: string
+          description: "User KYC Status [`pre_kyc`, `post_kyc`]"
+          default: pre_kyc
+        user_hash_id:
+          type: string
+          description: User Unique Identifier
+          default: b234cabd0cae5ea241589e4788ac727c
+        email:
+          type: string
+          description: User Email Address (For Razorpay) Can be used as auto-populated
+            contact email in their client-side form
+          default: test@email.com
+        mobile_country_code:
+          type: integer
+          description: User Mobile Country Code (For Razorpay) Can be used as auto-populated
+            contact number in their client-side form
+        mobile:
+          type: integer
+          description: User Mobile Number (For Razorpay) Can be used as auto-populated
+            contact number in their client-side form
+        preferred_name:
+          type: string
+          description: (For Razorpay) Can be used as auto-populated user name in their
+            client-side form
+          default: Jane Doe
+        in_route:
+          type: integer
+          description: (For Ingenico) (Required) Ingenico Product ID
+        currency:
+          type: string
+          description: "Currency code [ISO 3166](https://www.iso.org/iso-3166-country-codes.html)\
+            \ alpha-3"
+          default: SGD
+        country_code:
+          type: string
+          description: "(For Ingenico) [ISO 3166](https://www.iso.org/iso-3166-country-codes.html)\
+            \ alpha-2 country code"
+          default: SG
+        pan:
+          type: string
+          description: User's Card Primary Account Number
+        client_ref_id:
+          type: string
+          description: Consumer Identifier for a Payment Transaction
+        client_ip:
+          type: string
+          description: Client IP Address
+          default: ""
+        action_origin:
+          type: string
+          description: "Origin on where the payment transaction is executed [`admin`,\
+            \ `client`, `cron`, `payment_provider`]"
+          default: client
+    response_5:
+      title: response
+      required:
+      - consumer
+      - links
+      - payment_ref_id
+      - product
+      - provider
+      - user
+      type: object
+      properties:
+        payment_ref_id:
+          type: string
+          description: Unique Payment Reference Id
+          example: MMP-123456
+        consumer:
+          type: array
+          description: Consumer Details
+          items:
+            $ref: '#/components/schemas/response_4_consumer'
+        product:
+          type: array
+          description: Product Details
+          items:
+            $ref: '#/components/schemas/response_4_product'
+        provider:
+          type: array
+          description: Provider Details
+          items:
+            $ref: '#/components/schemas/response_4_provider'
+        user:
+          type: array
+          description: "User Details like hash id, email and any other user related\
+            \ info"
+          items:
+            $ref: '#/components/schemas/response_4_user'
+        links:
+          type: array
+          items:
+            $ref: '#/components/schemas/response_5_links'
+      example:
+        product:
+        - code: xxxpr
+          funding_type: pre-funding
+        - code: xxxpr
+          funding_type: pre-funding
+        provider:
+        - name: Provider A
+        - name: Provider A
+        payment_ref_id: MMP-123456
+        links:
+        - rel: rel
+          href: http://example.com/aeiou
+          parameters: {}
+        - rel: rel
+          href: http://example.com/aeiou
+          parameters: {}
+        user:
+        - email: test@example.com
+          hash_id: b234cabd0cae5ea241589e4788ac727c
+        - email: test@example.com
+          hash_id: b234cabd0cae5ea241589e4788ac727c
+        consumer:
+        - name: Consumer A
+          hash_id: 9e050afeed738f820b36a935c8ff1ed5
+        - name: Consumer A
+          hash_id: 9e050afeed738f820b36a935c8ff1ed5
+    response_6:
+      title: response
+      required:
+      - items
+      type: object
+      properties:
+        success:
+          type: boolean
+          description: Is success
+          example: true
+      example:
+        success: true
+    response_7:
+      title: response
+      required:
+      - description
+      - fee_details
+      - image
+      - name
+      - provider_type
+      - topup_min_amount
+      type: object
+      properties:
+        name:
+          type: string
+          description: Name of payment provider
+          example: EASYPAY2
+        product_code:
+          type: string
+          description: Product Code
+          example: sgmcpo
+        provider_type:
+          type: string
+          description: Available payment types
+          example: online
+        provider_hash:
+          type: string
+          description: Hash Value of Provider
+          example: 95206cbb4945effda887b4f9c656a9f0
+        provider_currency:
+          type: string
+          description: Provider Currency
+          example: SGD
+        provider_mode:
+          type: string
+          description: Mode of provider
+          example: online
+        date_created:
+          type: string
+          description: Date created
+          example: ' '
+        topup_min_amount:
+          type: string
+          description: Topup minimum amount
+          example: "10.000"
+        fee_details:
+          type: array
+          description: Topup fee details
+          items:
+            $ref: '#/components/schemas/response_7_fee_details'
+        description:
+          type: string
+          description: Description
+          default: Easypay by Wirecard
+        image:
+          type: array
+          description: Image
+          items:
+            $ref: '#/components/schemas/response_7_image'
+      example:
+        provider_type: online
+        image:
+        - source: source
+        - source: source
+        provider_mode: online
+        date_created: ' '
+        name: EASYPAY2
+        fee_details:
+        - fee_percentage: "5.000"
+          fee_flat: "3.000"
+          tax_flat: "0"
+          tax_percentage: "0"
+        - fee_percentage: "5.000"
+          fee_flat: "3.000"
+          tax_flat: "0"
+          tax_percentage: "0"
+        provider_currency: SGD
+        description: Easypay by Wirecard
+        topup_min_amount: "10.000"
+        product_code: sgmcpo
+        provider_hash: 95206cbb4945effda887b4f9c656a9f0
+    response_8:
+      title: response
+      required:
+      - items
+      type: object
+      properties:
+        items:
+          title: items
+          type: array
+          items:
+            $ref: '#/components/schemas/response_8_items'
+      example:
+        items:
+        - product:
+            code: xxxpr
+            funding_type: pre-funding
+          fees:
+            fee_percentage: "2.00"
+            fee_flat: "2.00"
+            computation: percentage
+          provider_channel:
+            code: post_office
+            name: Post Office
+          provider:
+            name: Provider A
+            id: 5d260bdcca738f820b36a935c8ff9fg8
+          consumer:
+            name: Consumer A
+            id: 9e050afeed738f820b36a935c8ff1ed5
+        - product:
+            code: xxxpr
+            funding_type: pre-funding
+          fees:
+            fee_percentage: "2.00"
+            fee_flat: "2.00"
+            computation: percentage
+          provider_channel:
+            code: post_office
+            name: Post Office
+          provider:
+            name: Provider A
+            id: 5d260bdcca738f820b36a935c8ff9fg8
+          consumer:
+            name: Consumer A
+            id: 9e050afeed738f820b36a935c8ff1ed5
+    consumer_hash_provider_hash_body:
+      required:
+      - inactivate
+      - product_code
+      type: object
+      properties:
+        product_code:
+          type: string
+          description: OP Product Code
+          default: sgmcpr
+        inactivate:
+          type: string
+          description: Will inactivate consumer rate
+          default: "true"
+          enum:
+          - "0"
+          - "1"
+    consumer_hash_provider_hash_body_1:
+      required:
+      - charge_flat
+      - charge_percentage
+      - fee_flat
+      - fee_percentage
+      - product_code
+      - service_flat
+      - service_percentage
+      - tax_flat
+      - tax_percentage
+      type: object
+      properties:
+        product_code:
+          type: string
+          description: product code
+          default: sgmcpr
+        fee_flat:
+          type: string
+          description: fee flat
+          default: "0.000"
+        fee_percentage:
+          type: string
+          description: fee percentage
+          default: "2.50"
+        tax_flat:
+          type: string
+          description: tax flat
+          default: "2.50"
+        tax_percentage:
+          type: string
+          description: tax percentage
+          default: "0.00"
+        charge_flat:
+          type: string
+          description: charge flat
+          default: "0.000"
+        charge_percentage:
+          type: string
+          description: charge percentage
+          default: "0.00"
+        service_flat:
+          type: string
+          description: service flat
+          default: "0.000"
+        service_percentage:
+          type: string
+          description: service percentage
+          default: "0.00"
+    response_9:
+      title: response
+      required:
+      - references
+      type: object
+      properties:
+        references:
+          title: references
+          type: array
+          items:
+            $ref: '#/components/schemas/ProviderChannels'
+      example:
+        references:
+        - code: post_office
+          name: Post Office
+          description: Singapore Post Office
+        - code: post_office
+          name: Post Office
+          description: Singapore Post Office
+    manage_providers_body:
+      required:
+      - currency
+      - description
+      - provider_mode
+      - provider_name
+      - type
+      type: object
+      properties:
+        provider_name:
+          type: string
+          description: provider name
+          default: testProvider
+        type:
+          type: string
+          description: Provider type
+          default: online
+          enum:
+          - online
+          - offline
+        provider_mode:
+          type: string
+          description: Provider mode
+          default: PS
+          enum:
+          - BT
+          - DCC
+          - CAS
+          - DD
+          - INV
+          - PV
+        currency:
+          type: string
+          description: "Currency code [ISO 3166](https://www.iso.org/iso-3166-country-codes.html)\
+            \ alpha-3"
+          default: SGD
+        algorithm:
+          type: string
+          description: "Hashing Algorithm [PHP](http://php.net/manual/en/function.hash-algos.php)"
+          default: sha512
+        description:
+          type: string
+          description: Provider description
+          default: ENets Payment Gateway
+    token_provider_hash_body:
+      required:
+      - amount
+      - consumer_hash
+      - kyc_status
+      - product_code
+      - user_hash_id
+      type: object
+      properties:
+        consumer_hash:
+          type: string
+          description: Consumer Hash ID
+        product_code:
+          type: string
+          description: OP Product Code
+        provider_channel:
+          type: string
+          description: Provider Channel
+        amount:
+          type: number
+          description: Topup amount
+        kyc_status:
+          type: string
+          description: "User KYC Status [pre_kyc, post_kyc]"
+        user_hash_id:
+          type: string
+          description: User Unique Identifier
+        email:
+          type: string
+          description: User Email Address
+        mobile_country_code:
+          type: integer
+          description: User Mobile Country Code
+        mobile:
+          type: integer
+          description: User Mobile Number
+        currency:
+          type: string
+          description: Currency code ISO 3166 alpha-3
+        pan:
+          type: string
+          description: User’s Card Primary Account Number
+        client_ref_id:
+          type: string
+          description: Consumer Identifier for a Payment Transaction
+        action_origin:
+          type: string
+          description: "Origin on where the payment transaction is executed [admin,\
+            \ client, cron, payment_provider]"
+    inline_response_200:
+      required:
+      - consumer
+      - expires_at
+      - fees
+      - message
+      - product
+      - provider
+      - user
+      type: object
+      properties:
+        payment_ref_id:
+          type: string
+          description: Unique Payment Reference Id
+        consumer:
+          type: array
+          description: Consumer Details
+          items:
+            $ref: '#/components/schemas/inline_response_200_consumer'
+        product:
+          type: array
+          description: Product Details
+          items:
+            $ref: '#/components/schemas/inline_response_200_product'
+        provider:
+          type: array
+          description: Provider Details
+          items:
+            $ref: '#/components/schemas/inline_response_200_provider'
+        user:
+          type: array
+          description: "User Details like hash id, email and any other user related\
+            \ info"
+          items:
+            $ref: '#/components/schemas/inline_response_200_user'
+        fees:
+          type: array
+          description: Fees breakdown
+          items:
+            $ref: '#/components/schemas/inline_response_200_fees'
+        expires_at:
+          type: string
+          description: Expiry date of the transaction
+          format: date
+        message:
+          type: string
+          description: Instuction or message from Relay to customer
+        expiry_duration:
+          type: integer
+          description: Expiry duration in seconds
+        qr_details:
+          type: array
+          items:
+            $ref: '#/components/schemas/inline_response_200_qr_details'
+        qr_image:
+          type: array
+          items:
+            $ref: '#/components/schemas/inline_response_200_qr_image'
+      example:
+        product:
+        - code: code
+          funding_type: funding_type
+        - code: code
+          funding_type: funding_type
+        fees:
+        - fee_percentage: 7.061401241503109
+          amount: 0.8008281904610115
+          fee_flat: 2.3021358869347655
+          calculation_mode: calculation_mode
+          total_fees: 6.027456183070403
+          credit_amount: 5.637376656633329
+          discount: 1.4658129805029452
+          currency: currency
+          net_amount: 5.962133916683182
+          computation: computation
+        - fee_percentage: 7.061401241503109
+          amount: 0.8008281904610115
+          fee_flat: 2.3021358869347655
+          calculation_mode: calculation_mode
+          total_fees: 6.027456183070403
+          credit_amount: 5.637376656633329
+          discount: 1.4658129805029452
+          currency: currency
+          net_amount: 5.962133916683182
+          computation: computation
+        expires_at: 2000-01-23
+        provider:
+        - name: name
+          channel:
+            code: code
+            name: name
+          hash_id: hash_id
+        - name: name
+          channel:
+            code: code
+            name: name
+          hash_id: hash_id
+        payment_ref_id: payment_ref_id
+        qr_details:
+        - a: a
+          v: v
+          m: m
+        - a: a
+          v: v
+          m: m
+        message: message
+        user:
+        - email: email
+          hash_id: hash_id
+        - email: email
+          hash_id: hash_id
+        consumer:
+        - name: name
+          hash_id: hash_id
+        - name: name
+          hash_id: hash_id
+        expiry_duration: 9
+        qr_image:
+        - url: url
+        - url: url
+      x-examples:
+        example-1:
+          payment_ref_id:
+            description: Unique Payment Reference Id
+            type: string
+            example: MMP-123456
+          consumer:
+            description: Consumer Details
+            properties:
+              hash_id:
+                description: Consumer Hash
+                type: string
+                example: 9e050afeed738f820b36a935c8ff1ed5
+              name:
+                description: Consumer Name
+                type: string
+                example: Consumer A
+          product:
+            description: Product Details
+            properties:
+              code:
+                description: Product Code
+                type: string
+                example: xxxpr
+              funding_type:
+                description: Funding Model
+                type: string
+                example: pre-funding
+          provider:
+            description: Provider Details
+            properties:
+              hash_id:
+                description: Consumer Hash
+                type: string
+                example: 5d260bdcca738f820b36a935c8ff9fg8
+              name:
+                description: Provider Name
+                type: string
+                example: Provider A
+              channel:
+                description: Provider Channel Details
+                properties:
+                  code:
+                    description: Provider Channel Code
+                    type: string
+                    example: post_office
+                  name:
+                    description: Provider Channel Name
+                    type: string
+                    example: Post Office
+          user:
+            description: "User Details like hash id, email and any other user related\
+              \ info"
+            properties:
+              hash_id:
+                description: User Hash
+                type: string
+                example: b234cabd0cae5ea241589e4788ac727c
+              email:
+                description: User Email Address
+                type: string
+                example: test@example.com
+          fees:
+            description: Fees breakdown
+            properties:
+              currency:
+                description: "Currency code [ISO 3166](https://www.iso.org/iso-3166-country-codes.html)\
+                  \ alpha-3"
+                type: string
+                example: SGD
+              amount:
+                description: Amount entered. Net amount and credit amount will differ
+                  depending on the current cppc fee settings.
+                type: decimal
+                example: "10.00"
+              total_fees:
+                description: "Total fees (provider, tax, charge, service)"
+                type: decimal
+                example: "2.00"
+              discount:
+                description: Discount offered
+                type: decimal
+                example: "0.00"
+              net_amount:
+                description: Total amount to pay
+                type: decimal
+                example: "10.00"
+              credit_amount:
+                description: Actual amount to be credited to MM Wallet
+                type: decimal
+                example: "8.00"
+              calculation_mode:
+                description: Mode on how the calculation of credit amount will be.
+                  `credit` means credit amount will be the exact amount entered; `net`
+                  means the amount entered less fees
+                type: string
+                example: net
+              computation:
+                description: "Flag on how the fee will be deducted, whether by `flat`\
+                  \ or `percentage`"
+                type: string
+                example: flat
+              fee_flat:
+                description: Fee in Flat
+                type: decimal
+                example: "2.00"
+              fee_percentage:
+                description: Fee in Percentage of the credit amount
+                type: decimal
+                example: "0.00"
+          expires_at:
+            description: Expiry date of the transaction
+            type: string
+            format: date
+            example: 2017/08/26 02:34:47PM SGT
+          message:
+            description: Instuction or message from Relay to customer
+            type: string
+            example: Please go to the payment channels or kiosks
+    TransactionStatus_details_fees:
+      properties:
+        currency:
+          type: string
+          description: "Currency code [ISO 3166](https://www.iso.org/iso-3166-country-codes.html)\
+            \ alpha-3"
+          example: SGD
+        amount:
+          type: decimal
+          description: Amount entered
+          example: "10.00"
+        total_fees:
+          type: decimal
+          description: "Total fees (provider, tax, charge, service)"
+          example: "2.00"
+        discount:
+          type: decimal
+          description: Discount offered
+          example: "0.00"
+        net_amount:
+          type: decimal
+          description: Total amount to pay
+          example: "10.00"
+        credit_amount:
+          type: decimal
+          description: Actual amount to be credited to MM Wallet
+          example: "8.00"
+        fee_flat:
+          type: decimal
+          description: flat fee
+          example: "2.00"
+        fee_percentage:
+          type: decimal
+          description: percentage fee
+          example: "0.00"
+      description: Fees breakdown
+      example:
+        fee_percentage: "0.00"
+        amount: "10.00"
+        fee_flat: "2.00"
+        total_fees: "2.00"
+        credit_amount: "8.00"
+        discount: "0.00"
+        currency: SGD
+        net_amount: "10.00"
+    TransactionStatus_details_user:
+      type: object
+      properties:
+        id:
+          type: string
+          description: User Hash ID
+          example: a4f7e6ca0f364315c6250cb294f03360
+        email:
+          type: string
+          description: User Email
+          example: johndoe@example.com
+        mobile_country_code:
+          type: string
+          description: User Mobile Country Code
+          example: "91"
+        mobile:
+          type: string
+          description: User Mobile
+          example: "1234567890"
+        name:
+          type: string
+          description: User Name
+          example: John Doe
+        product_code:
+          type: string
+          description: User OP Product Code
+          example: sgmcrpo
+      description: User details
+      example:
+        mobile: "1234567890"
+        name: John Doe
+        id: a4f7e6ca0f364315c6250cb294f03360
+        mobile_country_code: "91"
+        product_code: sgmcrpo
+        email: johndoe@example.com
+    TransactionStatus_details_source:
+      type: object
+      properties:
+        cust_id:
+          type: string
+          description: Customer MM User Hash ID
+          example: a4f7e6ca0f364315c6250cb294f03360
+        cust_email:
+          type: string
+          description: "Email entered from payment provider screen, if any"
+          example: ""
+        cust_phone:
+          type: string
+          description: "Mobile entered from payment provider screen, if any"
+          example: "1234567890"
+        cust_name:
+          type: string
+          description: "Name entered from payment provider screen, if any"
+          example: John Doe
+        referrer:
+          type: string
+          description: Payment screen url before provider initiated callback to RELAY
+          example: ""
+        type:
+          type: string
+          description: "Source type from payment screen whether entered Card, UPI,\
+            \ etc"
+          example: CARD
+        name:
+          type: string
+          description: Source type issuer name
+          example: Asia United Bank
+        account_number:
+          type: string
+          description: Source account number or address
+          example: 405900******1234
+        expiry:
+          type: string
+          description: "Source account expiry, if applicable"
+          example: "0521"
+        brand:
+          type: string
+          description: Source brand
+          example: VISA
+        funding_method:
+          type: string
+          description: Source funding method
+          example: CREDIT
+        authentication:
+          type: string
+          description: Source authentication
+          example: "000000"
+      description: Payment Source details
+      example:
+        referrer: ""
+        account_number: 405900******1234
+        funding_method: CREDIT
+        cust_email: ""
+        name: Asia United Bank
+        cust_name: John Doe
+        expiry: "0521"
+        type: CARD
+        cust_id: a4f7e6ca0f364315c6250cb294f03360
+        cust_phone: "1234567890"
+        brand: VISA
+        authentication: "000000"
+    TransactionStatus_details:
+      properties:
+        fees:
+          $ref: '#/components/schemas/TransactionStatus_details_fees'
+        user:
+          $ref: '#/components/schemas/TransactionStatus_details_user'
+        source:
+          $ref: '#/components/schemas/TransactionStatus_details_source'
+        provider:
+          type: object
+          properties: {}
+          description: Payment Provider Status Inquiry
+          example: {}
+      description: Topup Details
+      example:
+        fees:
+          fee_percentage: "0.00"
+          amount: "10.00"
+          fee_flat: "2.00"
+          total_fees: "2.00"
+          credit_amount: "8.00"
+          discount: "0.00"
+          currency: SGD
+          net_amount: "10.00"
+        provider: {}
+        source:
+          referrer: ""
+          account_number: 405900******1234
+          funding_method: CREDIT
+          cust_email: ""
+          name: Asia United Bank
+          cust_name: John Doe
+          expiry: "0521"
+          type: CARD
+          cust_id: a4f7e6ca0f364315c6250cb294f03360
+          cust_phone: "1234567890"
+          brand: VISA
+          authentication: "000000"
+        user:
+          mobile: "1234567890"
+          name: John Doe
+          id: a4f7e6ca0f364315c6250cb294f03360
+          mobile_country_code: "91"
+          product_code: sgmcrpo
+          email: johndoe@example.com
+    Fees_consumer:
+      properties:
+        id:
+          type: string
+          description: Consumer Hash
+          example: 9e050afeed738f820b36a935c8ff1ed5
+        name:
+          type: string
+          description: Consumer Name
+          example: Consumer A
+      description: Consumer Details
+      example:
+        name: Consumer A
+        id: 9e050afeed738f820b36a935c8ff1ed5
+    Fees_product:
+      properties:
+        code:
+          type: string
+          description: Product Code
+          example: xxxpr
+        funding_type:
+          type: string
+          description: Funding Model
+          example: pre-funding
+      description: Product Details
+      example:
+        code: xxxpr
+        funding_type: pre-funding
+    Fees_provider:
+      properties:
+        id:
+          type: string
+          description: Provider Hash
+          example: 5d260bdcca738f820b36a935c8ff9fg8
+        name:
+          type: string
+          description: Provider Name
+          example: Provider A
+      description: Provider Details
+      example:
+        name: Provider A
+        id: 5d260bdcca738f820b36a935c8ff9fg8
+    Fees_provider_channel:
+      properties:
+        code:
+          type: string
+          description: Provider Channel code
+          example: post_office
+        name:
+          type: string
+          description: Provider Channel Name
+          example: Post Office
+      description: Provider Channel Details
+      example:
+        code: post_office
+        name: Post Office
+    Fees_modified_by:
+      type: object
+      properties:
+        consumer_hash:
+          type: string
+          description: Consumer hash
+          example: 2017-10-03 00:36:11
+        consumer_name:
+          type: string
+          description: Consumer name
+          example: 2017-10-03 00:36:11
+      description: Consumer details of who modified last
+      example:
+        consumer_hash: 2017-10-03 00:36:11
+        consumer_name: 2017-10-03 00:36:11
+    VirtualAddress_user:
+      properties:
+        hash_id:
+          type: string
+          description: User MM Identifier
+          example: 6fc7936fd9dc1397e110390b0340b8e5
+        vpa:
+          type: string
+          description: User Virtual Payment Address
+          example: mm.911234567890@fbl
+        email:
+          type: string
+          description: User Email
+          example: centrum+911234567890@matchmvoe.com
+        mobile_country_code:
+          type: string
+          description: User Mobile Country Code
+          example: "91"
+        mobile:
+          type: string
+          description: User Mobile Number
+          example: "1234567890"
+        aadhaar:
+          type: string
+          description: User Aadhaar ID
+          example: "87628403945678"
+        code:
+          type: string
+          description: Provider User Code
+          example: ENTITY
+      description: User Details
+    VirtualAddress_bank:
+      properties:
+        name:
+          type: string
+          description: Bank Name
+          example: Federal
+        account_number:
+          type: string
+          description: Bank Account Number
+          example: XXXXXXXXXXXX1234
+        account_type:
+          type: string
+          description: Bank Account Type
+          example: SAVINGS
+        ifsc:
+          type: string
+          description: Bank IFSC code
+          example: FDRL1111111
+      description: User Bank Details
+    TransactionItem_refund_details:
+      type: object
+      properties:
+        status:
+          type: string
+          description: MM Settlement Refund Status
+          example: "2"
+        message:
+          type: string
+          description: MM Settlement Refund Status Message
+          example: Success
+        original_pg_status:
+          type: string
+          description: Original Credit Status from Provider
+          example: Settled
+        original_mm_status:
+          type: string
+          description: Original Credit Status from MM
+          example: "0"
+        settlement_pg_status:
+          type: string
+          description: Refund Status from Provider
+          example: Captured
+      description: Refund Details
+    TransactionItem_fee:
+      type: object
+      properties:
+        fee_flat:
+          type: decimal
+          description: Basic fee in flat
+          example: "0.000"
+        fee_percentage:
+          type: decimal
+          description: Basic fee in percentage
+          example: "0.00"
+        tax_flat:
+          type: decimal
+          description: Tax fee in flat
+          example: "0.000"
+        tax_percentage:
+          type: decimal
+          description: Tax fee in percentage
+          example: "0.00"
+        charge_flat:
+          type: decimal
+          description: Charge fee in flat
+          example: "0.000"
+        charge_percentage:
+          type: decimal
+          description: Charge fee in percentage
+          example: "0.00"
+        service_flat:
+          type: decimal
+          description: Service fee in flat
+          example: "0.000"
+        service_percentage:
+          type: decimal
+          description: Service fee in percentage
+          example: "0.00"
+      description: Fee breakdown
+    response_reference:
+      properties:
+        payment_ref_id:
+          type: string
+          description: Reference ID generated by Relay to return back to the consumer
+          example: MPIN-UT-KPMJY-37706
+        client_ref_id:
+          type: string
+          description: Reference ID that consumer can pass to identify the transaction
+          example: MPIN-UT-KPMJY-37706
+        provider_ref_id:
+          type: string
+          description: Reference ID generated by Provider to help identify the transaction
+            as needed in settlement reports and such
+          example: "1199181003123030"
+        ref_id:
+          type: string
+          description: Transaction reference identifier from OP
+          example: 46fc2fc09405f5e1ad66f9958316f38a75244d329b5fba33e4fae2d31f408b78
+        payment_id:
+          type: string
+          description: Topup transaction reference identifier
+          example: SGMCPREASYPAY2003B9C1F5000038E3D
+      example:
+        client_ref_id: MPIN-UT-KPMJY-37706
+        ref_id: 46fc2fc09405f5e1ad66f9958316f38a75244d329b5fba33e4fae2d31f408b78
+        payment_ref_id: MPIN-UT-KPMJY-37706
+        payment_id: SGMCPREASYPAY2003B9C1F5000038E3D
+        provider_ref_id: "1199181003123030"
+    response_topup:
+      properties:
+        currency:
+          type: string
+          description: "Currency code [ISO 3166](https://www.iso.org/iso-3166-country-codes.html)\
+            \ alpha-3"
+          example: SGD
+        amount:
+          type: number
+          description: Topup Amount
+          format: float
+          example: 10.000
+      example:
+        amount: 10.000
+        currency: SGD
+    response_user:
+      properties:
+        email:
+          type: string
+          description: User email address
+          example: test@email.com
+        mobile_country_code:
+          type: integer
+          description: User mobile country code
+          example: 65
+        mobile:
+          type: integer
+          description: User mobile number
+          example: 11111111
+      example:
+        mobile: 11111111
+        mobile_country_code: 65
+        email: test@email.com
+    response_details:
+      properties:
+        reference:
+          type: array
+          items:
+            $ref: '#/components/schemas/response_reference'
+        topup:
+          type: array
+          items:
+            $ref: '#/components/schemas/response_topup'
+        user:
+          type: array
+          items:
+            $ref: '#/components/schemas/response_user'
+      example:
+        reference:
+        - client_ref_id: MPIN-UT-KPMJY-37706
+          ref_id: 46fc2fc09405f5e1ad66f9958316f38a75244d329b5fba33e4fae2d31f408b78
+          payment_ref_id: MPIN-UT-KPMJY-37706
+          payment_id: SGMCPREASYPAY2003B9C1F5000038E3D
+          provider_ref_id: "1199181003123030"
+        - client_ref_id: MPIN-UT-KPMJY-37706
+          ref_id: 46fc2fc09405f5e1ad66f9958316f38a75244d329b5fba33e4fae2d31f408b78
+          payment_ref_id: MPIN-UT-KPMJY-37706
+          payment_id: SGMCPREASYPAY2003B9C1F5000038E3D
+          provider_ref_id: "1199181003123030"
+        topup:
+        - amount: 10.000
+          currency: SGD
+        - amount: 10.000
+          currency: SGD
+        user:
+        - mobile: 11111111
+          mobile_country_code: 65
+          email: test@email.com
+        - mobile: 11111111
+          mobile_country_code: 65
+          email: test@email.com
+    response_3_details_reference:
+      properties:
+        payment_ref_id:
+          type: string
+          description: Reference ID generated by Relay to return back to the consumer
+          example: MPIN-UT-KPMJY-37706
+        client_ref_id:
+          type: string
+          description: Reference ID that consumer can pass to identify the transaction
+          example: MPIN-UT-KPMJY-37706
+        ref_id:
+          type: string
+          description: Transaction reference identifier from OP
+          example: 46fc2fc09405f5e1ad66f9958316f38a75244d329b5fba33e4fae2d31f408b78
+        payment_id:
+          type: string
+          description: Topup transaction reference identifier
+          example: SGMCPREASYPAY2003B9C1F5000038E3D
+      description: Transaction Reference IDs
+      example:
+        client_ref_id: MPIN-UT-KPMJY-37706
+        ref_id: 46fc2fc09405f5e1ad66f9958316f38a75244d329b5fba33e4fae2d31f408b78
+        payment_ref_id: MPIN-UT-KPMJY-37706
+        payment_id: SGMCPREASYPAY2003B9C1F5000038E3D
+    response_3_details_topup:
+      properties:
+        currency:
+          type: string
+          description: "Currency code [ISO 3166](https://www.iso.org/iso-3166-country-codes.html)\
+            \ alpha-3"
+          example: SGD
+        amount:
+          type: decimal
+          description: Actual amount to be credited to MM Wallet
+          example: "8.00"
+      description: Fees breakdown
+      example:
+        amount: "8.00"
+        currency: SGD
+    response_3_details_fees:
+      properties:
+        currency:
+          type: string
+          description: "Currency code [ISO 3166](https://www.iso.org/iso-3166-country-codes.html)\
+            \ alpha-3"
+          example: SGD
+        amount:
+          type: decimal
+          description: Amount entered. Net amount and credit amount will differ depending
+            on the current cppc fee settings.
+          example: "10.00"
+        total_fees:
+          type: decimal
+          description: "Total fees (provider, tax, charge, service)"
+          example: "2.00"
+        discount:
+          type: decimal
+          description: Discount offered
+          example: "0.00"
+        net_amount:
+          type: decimal
+          description: Total amount to pay
+          example: "10.00"
+        credit_amount:
+          type: decimal
+          description: Actual amount to be credited to MM Wallet
+          example: "8.00"
+        calculation_mode:
+          type: string
+          description: Mode on how the calculation of credit amount will be. `credit`
+            means credit amount will be the exact amount entered; `net` means the
+            amount entered less fees
+          example: net
+        computation:
+          type: string
+          description: "Flag on how the fee will be deducted, whether by `flat` or\
+            \ `percentage`"
+          example: flat
+        fee_flat:
+          type: decimal
+          description: Fee in Flat
+          example: "2.00"
+        fee_percentage:
+          type: decimal
+          description: Fee in Percentage of the credit amount
+          example: "0.00"
+      description: Fees breakdown
+      example:
+        fee_percentage: "0.00"
+        amount: "10.00"
+        fee_flat: "2.00"
+        calculation_mode: net
+        total_fees: "2.00"
+        credit_amount: "8.00"
+        discount: "0.00"
+        currency: SGD
+        net_amount: "10.00"
+        computation: flat
+    response_3_details_user:
+      properties:
+        email:
+          type: string
+          description: User email address
+          example: test@email.com
+        mobile_country_code:
+          type: integer
+          description: User mobile country code
+          example: 65
+        mobile:
+          type: integer
+          description: User mobile number
+          example: 11111111
+      description: User information
+      example:
+        mobile: 11111111
+        mobile_country_code: 65
+        email: test@email.com
+    response_3_details:
+      properties:
+        reference:
+          $ref: '#/components/schemas/response_3_details_reference'
+        topup:
+          $ref: '#/components/schemas/response_3_details_topup'
+        fees:
+          $ref: '#/components/schemas/response_3_details_fees'
+        user:
+          $ref: '#/components/schemas/response_3_details_user'
+      description: Topup Details
+      example:
+        reference:
+          client_ref_id: MPIN-UT-KPMJY-37706
+          ref_id: 46fc2fc09405f5e1ad66f9958316f38a75244d329b5fba33e4fae2d31f408b78
+          payment_ref_id: MPIN-UT-KPMJY-37706
+          payment_id: SGMCPREASYPAY2003B9C1F5000038E3D
+        fees:
+          fee_percentage: "0.00"
+          amount: "10.00"
+          fee_flat: "2.00"
+          calculation_mode: net
+          total_fees: "2.00"
+          credit_amount: "8.00"
+          discount: "0.00"
+          currency: SGD
+          net_amount: "10.00"
+          computation: flat
+        topup:
+          amount: "8.00"
+          currency: SGD
+        user:
+          mobile: 11111111
+          mobile_country_code: 65
+          email: test@email.com
+    response_4_consumer:
+      properties:
+        hash_id:
+          type: string
+          description: Consumer Hash
+          example: 9e050afeed738f820b36a935c8ff1ed5
+        name:
+          type: string
+          description: Consumer Name
+          example: Consumer A
+      example:
+        name: Consumer A
+        hash_id: 9e050afeed738f820b36a935c8ff1ed5
+    response_4_product:
+      properties:
+        code:
+          type: string
+          description: Product Code
+          example: xxxpr
+        funding_type:
+          type: string
+          description: Funding Model
+          example: pre-funding
+      example:
+        code: xxxpr
+        funding_type: pre-funding
+    response_4_provider:
+      properties:
+        name:
+          type: string
+          description: Provider Name
+          example: Provider A
+      example:
+        name: Provider A
+    response_4_user:
+      properties:
+        hash_id:
+          type: string
+          description: User Hash
+          example: b234cabd0cae5ea241589e4788ac727c
+        email:
+          type: string
+          description: User Email Address
+          example: test@example.com
+      example:
+        email: test@example.com
+        hash_id: b234cabd0cae5ea241589e4788ac727c
+    response_5_links:
+      properties:
+        rel:
+          type: string
+          description: Self-link to href value
+        href:
+          type: string
+          description: Payment Gateway URL
+          format: uri
+        parameters:
+          type: object
+          description: Dynamic values returned from the payment gateway
+      example:
+        rel: rel
+        href: http://example.com/aeiou
+        parameters: {}
+    response_7_fee_details:
+      properties:
+        fee_flat:
+          type: string
+          description: Flat fee for topup
+          example: "3.000"
+        fee_percentage:
+          type: string
+          description: Percentage fee for topup
+          example: "5.000"
+        tax_flat:
+          type: string
+          description: Flat tax
+          example: "0"
+        tax_percentage:
+          type: string
+          description: Tax percentage
+          example: "0"
+      example:
+        fee_percentage: "5.000"
+        fee_flat: "3.000"
+        tax_flat: "0"
+        tax_percentage: "0"
+    response_7_image:
+      properties:
+        source:
+          type: string
+          description: Image source
+          default: ""
+      example:
+        source: source
+    response_8_fees:
+      properties:
+        computation:
+          type: string
+          description: Computation type
+          example: percentage
+        fee_flat:
+          type: decimal
+          description: Flat Fee
+          example: "2.00"
+        fee_percentage:
+          type: decimal
+          description: Fee percentage
+          example: "2.00"
+      description: Fees breakdown
+      example:
+        fee_percentage: "2.00"
+        fee_flat: "2.00"
+        computation: percentage
+    response_8_items:
+      properties:
+        consumer:
+          $ref: '#/components/schemas/Fees_consumer'
+        product:
+          $ref: '#/components/schemas/Fees_product'
+        provider:
+          $ref: '#/components/schemas/Fees_provider'
+        provider_channel:
+          $ref: '#/components/schemas/Fees_provider_channel'
+        fees:
+          $ref: '#/components/schemas/response_8_fees'
+      example:
+        product:
+          code: xxxpr
+          funding_type: pre-funding
+        fees:
+          fee_percentage: "2.00"
+          fee_flat: "2.00"
+          computation: percentage
+        provider_channel:
+          code: post_office
+          name: Post Office
+        provider:
+          name: Provider A
+          id: 5d260bdcca738f820b36a935c8ff9fg8
+        consumer:
+          name: Consumer A
+          id: 9e050afeed738f820b36a935c8ff1ed5
+    inline_response_200_consumer:
+      type: object
+      properties:
+        hash_id:
+          type: string
+          description: Consumer Hash
+        name:
+          type: string
+          description: Consumer Name
+      example:
+        name: name
+        hash_id: hash_id
+    inline_response_200_product:
+      type: object
+      properties:
+        code:
+          type: string
+          description: Product Code
+        funding_type:
+          type: string
+          description: Funding Model
+      example:
+        code: code
+        funding_type: funding_type
+    inline_response_200_channel:
+      type: object
+      properties:
+        code:
+          type: string
+          description: Provider Channel Code
+        name:
+          type: string
+          description: Provider Channel Name
+      description: Provider Channel Details
+      example:
+        code: code
+        name: name
+    inline_response_200_provider:
+      type: object
+      properties:
+        hash_id:
+          type: string
+          description: Consumer Hash
+        name:
+          type: string
+          description: Provider Name
+        channel:
+          $ref: '#/components/schemas/inline_response_200_channel'
+      example:
+        name: name
+        channel:
+          code: code
+          name: name
+        hash_id: hash_id
+    inline_response_200_user:
+      type: object
+      properties:
+        hash_id:
+          type: string
+          description: User Hash
+        email:
+          type: string
+          description: User Email Address
+      example:
+        email: email
+        hash_id: hash_id
+    inline_response_200_fees:
+      type: object
+      properties:
+        currency:
+          type: string
+          description: "Currency code [ISO 3166](https://www.iso.org/iso-3166-country-codes.html)\
+            \ alpha-3"
+        amount:
+          type: number
+          description: Amount entered. Net amount and credit amount will differ depending
+            on the current cppc fee settings.
+        total_fees:
+          type: number
+          description: "Total fees (provider, tax, charge, service)"
+        discount:
+          type: number
+          description: Discount offered
+        net_amount:
+          type: number
+          description: Total amount to pay
+        credit_amount:
+          type: number
+          description: Actual amount to be credited to MM Wallet
+        calculation_mode:
+          type: string
+          description: Mode on how the calculation of credit amount will be. `credit`
+            means credit amount will be the exact amount entered; `net` means the
+            amount entered less fees
+        computation:
+          type: string
+          description: "Flag on how the fee will be deducted, whether by `flat` or\
+            \ `percentage`"
+        fee_flat:
+          type: number
+          description: Fee in Flat
+        fee_percentage:
+          type: number
+          description: Fee in Percentage of the credit amount
+      example:
+        fee_percentage: 7.061401241503109
+        amount: 0.8008281904610115
+        fee_flat: 2.3021358869347655
+        calculation_mode: calculation_mode
+        total_fees: 6.027456183070403
+        credit_amount: 5.637376656633329
+        discount: 1.4658129805029452
+        currency: currency
+        net_amount: 5.962133916683182
+        computation: computation
+    inline_response_200_qr_details:
+      type: object
+      properties:
+        v:
+          type: string
+        a:
+          type: string
+        m:
+          type: string
+      example:
+        a: a
+        v: v
+        m: m
+    inline_response_200_qr_image:
+      type: object
+      properties:
+        url:
+          type: string
+          description: QR code URL
+      example:
+        url: url
+  requestBodies:
+    postManageConsumersAcl:
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            required:
+            - consumer_hash
+            - resource_id
+            type: object
+            properties:
+              consumer_hash:
+                type: string
+                description: hash_id from consumers table
+                default: 007b859be372e1bb0db954c7cf3a0519
+              resource_id:
+                type: string
+                description: id from acl_resources
+                default: "1"
+    postCheckoutValidate_providerHash_:
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            required:
+            - amount
+            - consumer_hash
+            - kyc_status
+            - product_code
+            - user_hash_id
+            type: object
+            properties:
+              consumer_hash:
+                type: string
+                description: Consumer Hash ID
+                default: 9e050afeed738f820b36a935c8ff1ed5
+              product_code:
+                type: string
+                description: OP Product Code
+                default: sgmcpr
+              amount:
+                type: integer
+                description: Topup amount
+                format: float
+              user_hash_id:
+                type: string
+                description: User Unique Identifier
+                default: b234cabd0cae5ea241589e4788ac727c
+              kyc_status:
+                type: string
+                description: Kyc status
+                default: pre_kyc

@@ -1,0 +1,11 @@
+# InlineResponse20014Date
+
+## Properties
+Name | Type | Description | Notes
+------------ | ------------- | ------------- | -------------
+**Expiry** | **string** |  | [optional] [default to null]
+**Issued** | **string** |  | [optional] [default to null]
+**Closed** | **string** |  | [optional] [default to null]
+
+[[Back to Model list]](../README.md#documentation-for-models) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to README]](../README.md)
+
